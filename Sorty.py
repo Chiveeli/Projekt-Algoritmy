@@ -4,7 +4,7 @@ Tabuľka 2 – porovnanie triediacich algoritmov
 Zadanie:
 - RadixSort + jeden z (Bubble, Insert, Select) + jeden z (Quick, Merge, Heap)
   -> v tabuľke 2 sú vybrané: Bubble Sort, Quick Sort, Radix Sort
-  (program pre porovnanie meria všetky algoritmy z tabuľky)
+  (ostatné algoritmy sú v programe tiež, meria a vypisuje sa však len to, čo je v tabuľke)
 - tých istých 5 rôznych dátových sád o veľkosti 10 000 pre všetky algoritmy
 - merať čas, počet porovnaní (if, while) a počet presunov dát
 - z priemerov odhadnúť priemery pre N = 20 000 (vzorce v Exceli) a porovnať so skutočnosťou
@@ -14,7 +14,9 @@ Počet presunov  = počet zápisov prvku dát na nové miesto (výmena dvoch prv
 """
 
 import json
+import math
 import random
+import statistics
 import time
 
 VELKOSTI_SAD = (10_000, 20_000)
@@ -328,6 +330,13 @@ ALGORITMY = {
     "Radix Sort": radixSort,
 }
 
+# algoritmy v tabuľke 2 podľa zadania a ich zložitosť
+V_TABULKE = {
+    "Bubble Sort": "O(n²)",
+    "Quick Sort": "O(n·log n)",
+    "Radix Sort": "O(d·n)",
+}
+
 
 def zmeraj(sort_funkcia, data):
     """Zoradí kópiu dát, vráti (čas v ms, porovnania, presuny)."""
@@ -340,21 +349,79 @@ def zmeraj(sort_funkcia, data):
     return (kon - zac) * 1000, comparisons, moves
 
 
+def koeficient_odhadu(zlozitost, n1, n2):
+    """Koľkokrát viac práce čakáme pri n2 prvkoch podľa zložitosti algoritmu."""
+    if zlozitost == "O(n²)":
+        return (n2 / n1) ** 2
+    if zlozitost == "O(n·log n)":
+        return (n2 * math.log2(n2)) / (n1 * math.log2(n1))
+    return n2 / n1                  # O(d·n), d je pri oboch sadách rovnaké
+
+
+def casove_anomalie(casy):
+    """Indexy meraní, ktorých čas je väčší ako 2 × medián."""
+    median = statistics.median(casy)
+    return {i for i, cas in enumerate(casy) if cas > 2 * median}
+
+
+def priemer(merania, kluc):
+    """Priemer stĺpca; pri čase bez anomálií."""
+    hodnoty = [m[kluc] for m in merania]
+    zle = casove_anomalie(hodnoty) if kluc == "cas_ms" else set()
+    dobre = [h for i, h in enumerate(hodnoty) if i not in zle]
+    return sum(dobre) / len(dobre)
+
+
+def vypis_cast(nazov, kluc, fmt, vysledky, n1, n2):
+    """Jedna časť tabuľky 2 (čas, porovnania alebo presuny) pre obe veľkosti sád."""
+    for n in (n1, n2):
+        print(f"\n{nazov}, N = {n}")
+        odhad_hlavicka = f"{'Odhad':>14}" if n == n2 else ""
+        merania_hlavicka = "".join(f"{i + 1:>14}" for i in range(POCET_SAD))
+        print(f"{'Algoritmus':12} {'Zložitosť':11}{odhad_hlavicka}{merania_hlavicka}{'Priemer':>14}")
+
+        for alg, zlozitost in V_TABULKE.items():
+            hodnoty = [m[kluc] for m in vysledky[n][alg]]
+            zle = casove_anomalie(hodnoty) if kluc == "cas_ms" else set()
+            riadok = f"{alg:12} {zlozitost:11}"
+            if n == n2:
+                odhad = priemer(vysledky[n1][alg], kluc) * koeficient_odhadu(zlozitost, n1, n2)
+                riadok += f"{odhad:>14{fmt}}"
+            riadok += "".join(f"{format(h, fmt) + ('*' if i in zle else ''):>14}" for i, h in enumerate(hodnoty))
+            print(riadok + f"{priemer(vysledky[n][alg], kluc):>14{fmt}}")
+
+
+def vypis_vyhodnotenie(vysledky, n1, n2):
+    print(f"\nVyhodnotenie odhadu pre N = {n2} (odhad / skutočnosť)")
+    print(f"{'Algoritmus':12} {'čas':>10} {'porovnania':>12} {'presuny':>10}")
+    for alg, zlozitost in V_TABULKE.items():
+        k = koeficient_odhadu(zlozitost, n1, n2)
+        pomery = [priemer(vysledky[n1][alg], kluc) * k / priemer(vysledky[n2][alg], kluc)
+                  for kluc in ("cas_ms", "porovnania", "presuny")]
+        print(f"{alg:12} {pomery[0]:>10.1%} {pomery[1]:>12.1%} {pomery[2]:>10.1%}")
+
+
 if __name__ == "__main__":
     vysledky = {}
 
     for n in VELKOSTI_SAD:
-        vysledky[n] = {nazov: [] for nazov in ALGORITMY}
+        print(f"Meriam N = {n} ...")
+        vysledky[n] = {nazov: [] for nazov in V_TABULKE}
 
         for j in range(POCET_SAD):
             # tá istá dátová sada pre všetky tri algoritmy
             zoznam = [random.randint(0, MAX_HODNOTA) for _ in range(n)]
 
-            print(f"\nN = {n}, sada {j + 1}")
-            for nazov, funkcia in ALGORITMY.items():
-                cas_ms, comparisons, moves = zmeraj(funkcia, zoznam)
+            for nazov in V_TABULKE:
+                cas_ms, comparisons, moves = zmeraj(ALGORITMY[nazov], zoznam)
                 vysledky[n][nazov].append({"cas_ms": cas_ms, "porovnania": comparisons, "presuny": moves})
-                print(f"  {nazov:12} čas: {cas_ms:12.3f} ms   porovnania: {comparisons:12}   presuny: {moves:12}")
+
+    n1, n2 = VELKOSTI_SAD
+    vypis_cast("Doba zoraďovania (ms)", "cas_ms", ".3f", vysledky, n1, n2)
+    vypis_cast("Počet porovnaní (if, while)", "porovnania", ".0f", vysledky, n1, n2)
+    vypis_cast("Počet presunov dát", "presuny", ".0f", vysledky, n1, n2)
+    vypis_vyhodnotenie(vysledky, n1, n2)
+    print("\n* časová anomália (čas > 2 × medián 5 meraní), nie je v priemere")
 
     with open("vysledky_tabulka2.json", "w", encoding="utf-8") as f:
         json.dump(vysledky, f, ensure_ascii=False, indent=2)

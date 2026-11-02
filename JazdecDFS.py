@@ -61,20 +61,57 @@ STARTY = [(4, 0, 0), (4, 1, 0), (4, 1, 1),
           (6, 0, 0), (6, 1, 0), (6, 2, 0), (6, 1, 1), (6, 2, 1), (6, 2, 2),
           (7, 0, 0), (8, 0, 0)]
 
+def zakladny_start(x, y):
+    """Štart pre n = 4 rovnakého typu: roh, okraj alebo stred (na 4 × 4 sú symetrické)."""
+    if (x, y) == (0, 0):
+        return 0, 0
+    if (x, y) in ((1, 0), (2, 0)):
+        return 1, 0
+    return 1, 1
+
+
+def vypis_hlavicku(algoritmus):
+    print(f"Jazdec na šachovnici (zložitosť = O(8^n²)) {algoritmus}")
+    print(f"{'n':>2} {'start':>5} {'cesta':>10} {'cesty odhad':>12} {'cesty skutočnosť':>17} "
+          f"{'čas odhad (ms)':>15} {'čas skutočnosť (ms)':>20} {'odhad/skut. cesty':>18} {'odhad/skut. čas':>16}")
+
+
+def vypis_riadok(velkost, x, y, nasiel, kroky, cas_ms, dokoncene, zaklad):
+    """Riadok tabuľky 3; zaklad = {(x, y): (kroky, čas)} z meraní pre n = 4."""
+    cesta = ("áno" if nasiel else "nie") if dokoncene else "prerušené"
+    znak = "" if dokoncene else "≥ "
+    kroky_text, cas_text = f"{znak}{kroky:_}".replace("_", " "), f"{znak}{cas_ms:.3f}"
+    if velkost == 4:
+        zaklad[(x, y)] = (kroky, cas_ms)
+        odhad_krokov = odhad_casu = pomer_krokov = pomer_casu = "X"
+    else:
+        zaklad_krokov, zaklad_casu = zaklad[zakladny_start(x, y)]
+        krat = 8 ** (velkost ** 2 - 4 ** 2)
+        horna = "" if dokoncene else "≤ "
+        odhad_krokov, odhad_casu = f"{zaklad_krokov * krat:.2E}", f"{zaklad_casu * krat:.2E}"
+        pomer_krokov = f"{horna}{zaklad_krokov * krat / kroky:.1E}"
+        pomer_casu = f"{horna}{zaklad_casu * krat / cas_ms:.1E}"
+    print(f"{velkost:>2} {f'{x},{y}':>5} {cesta:>10} {odhad_krokov:>12} {kroky_text:>17} "
+          f"{odhad_casu:>15} {cas_text:>20} {pomer_krokov:>18} {pomer_casu:>16}", flush=True)
+
+
 if __name__ == "__main__":
     # python JazdecDFS.py [limit v sekundách pre jeden beh]
-    limit_s = float(sys.argv[1]) if len(sys.argv) > 1 else 600
+    limit_s = float(sys.argv[1]) if len(sys.argv) > 1 else 120
     vysledky = []
+    zaklad = {}
+    vypis_hlavicku("DFS")
 
     for velkost, x, y in STARTY:
         nasiel, cesta, kroky, cas_ms, dokoncene = jazdec_dfs(velkost, x, y, limit_s)
-        stav = nasiel if dokoncene else f"prerušené po {limit_s:.0f} s"
-        print(f"n = {velkost}  x,y = ({x},{y})  {stav}  {kroky:15_} ciest  {cas_ms:14.3f} ms".replace("_", " "))
+        vypis_riadok(velkost, x, y, nasiel, kroky, cas_ms, dokoncene, zaklad)
         vysledky.append({"n": velkost, "x": x, "y": y, "nasiel": nasiel, "kroky": kroky,
                          "cas_ms": cas_ms, "dokoncene": dokoncene, "limit_s": limit_s})
 
     with open("vysledky_jazdec_dfs.json", "w", encoding="utf-8") as f:
         json.dump(vysledky, f, ensure_ascii=False, indent=2)
+
+    print("≥ výpočet bol prerušený po časovom limite, skutočná hodnota je väčšia")
 
 #   Jazdec na sachovnici (počet skúmaných ciest, merané JazdecDFS.py, limit 120 s)
 #   n = 4    x,y = (0,0)    False         17 784

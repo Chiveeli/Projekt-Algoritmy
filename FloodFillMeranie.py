@@ -7,6 +7,7 @@ Zaznamená sa počet prefarbených pixelov a čas vypĺňania v ms.
 """
 import json
 import os
+import statistics
 import time
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")   # bez otvárania okna
@@ -60,12 +61,28 @@ if __name__ == "__main__":
     for algoritmus in ALGORITMY:
         vypln(nove_platno(UTVARY[0][1]), UTVARY[0][2], algoritmus)
 
+    print("Flood Fill (zložitosť = O(n), n = počet pixelov)")
+    print(f"{'n (pixely)':>10} {'algoritmus':>10} {'čas odhad (ms)':>15} {'čas skutočnosť (ms)':>20} "
+          f"{'odhad / skut.':>14}  útvar")
+
     vysledky = []
     for algoritmus in ALGORITMY:
+        merania = []
         for nazov, kresli, start in UTVARY:
             pocet, cas_ms = vypln(nove_platno(kresli), start, algoritmus)
-            print(f"{algoritmus:6} {nazov:22} {pocet:8} px {cas_ms:10.3f} ms")
-            vysledky.append({"algoritmus": algoritmus, "utvar": nazov, "pixely": pocet, "cas_ms": cas_ms})
+            merania.append({"algoritmus": algoritmus, "utvar": nazov, "pixely": pocet, "cas_ms": cas_ms})
+
+        median = statistics.median(m["cas_ms"] / m["pixely"] for m in merania)
+        zaklad = merania[0]
+        for i, m in enumerate(merania):
+            odhad = zaklad["cas_ms"] * m["pixely"] / zaklad["pixely"]
+            odhad_text, pomer = ("X", "X") if i == 0 else (f"{odhad:.3f}", f"{odhad / m['cas_ms']:.1%}")
+            znak = "*" if m["cas_ms"] / m["pixely"] > 2 * median else ""
+            print(f"{m['pixely']:>10} {algoritmus:>10} {odhad_text:>15} {m['cas_ms']:>19.3f}{znak:1} "
+                  f"{pomer:>14}  {m['utvar']}")
+        vysledky += merania
+
+    print("* časová anomália (čas na 1 pixel > 2 × medián), odhad = čas prvého útvaru · n / n₁")
 
     with open("vysledky_floodfill.json", "w", encoding="utf-8") as f:
         json.dump(vysledky, f, ensure_ascii=False, indent=2)

@@ -11,7 +11,9 @@ Zadanie:
 
 import bisect
 import json
+import math
 import random
+import statistics
 import time
 
 
@@ -123,27 +125,58 @@ def meraj(search_funkcia, arr, hladane_hodnoty):
     return vysledky
 
 
-def vypis_vysledky(n, nazov, vysledky):
-    print(f"\n{nazov} N = {n:,}".replace(",", " "))
-    print("-" * 60)
-    print("Hodnota\tPozicia\tCas [ms]\tPorovnania")
-
-    for hodnota, pozicia, cas_ms, porovnania in vysledky:
-        print(f"{hodnota}\t{pozicia}\t{cas_ms:.6f}\t{porovnania}")
+def anomalie(vysledky):
+    """Indexy meraní, ktorých čas na 1 porovnanie je väčší ako 2 × medián sady."""
+    casy = [cas_ms / porovnania for _, _, cas_ms, porovnania in vysledky]
+    median = statistics.median(casy)
+    return {i for i, cas in enumerate(casy) if cas > 2 * median}
 
 
-def vypis_priemery(label, ls_vysledky, bs_vysledky):
-    ls_priemer_cas = sum(r[2] for r in ls_vysledky) / len(ls_vysledky)
-    ls_priemer_porovnania = sum(r[3] for r in ls_vysledky) / len(ls_vysledky)
+def priemery(vysledky):
+    """Vráti priemerný čas (bez anomálií) a priemerný počet porovnaní."""
+    zle = anomalie(vysledky)
+    casy = [r[2] for i, r in enumerate(vysledky) if i not in zle]
+    return sum(casy) / len(casy), sum(r[3] for r in vysledky) / len(vysledky)
 
-    bs_priemer_cas = sum(r[2] for r in bs_vysledky) / len(bs_vysledky)
-    bs_priemer_porovnania = sum(r[3] for r in bs_vysledky) / len(bs_vysledky)
 
-    print(f"\nPriemer {label}")
-    print(f"LS čas: {ls_priemer_cas:.10f} ms")
-    print(f"LS porovnania: {ls_priemer_porovnania}")
-    print(f"BS čas: {bs_priemer_cas:.10f} ms")
-    print(f"BS porovnania: {bs_priemer_porovnania}")
+def vypis_tabulku(n, nazov_sady, ls_vysledky, bs_vysledky):
+    zle_ls, zle_bs = anomalie(ls_vysledky), anomalie(bs_vysledky)
+
+    print(f"\nTabuľka 1 – sada {nazov_sady} = {n:_}".replace("_", " "))
+    print(f"{'':>3} {'Hľadaná':>12} | {'LS pozícia':>11} {'LS čas (ms)':>13} {'LS porovnania':>14} | "
+          f"{'BS pozícia':>11} {'BS čas (ms)':>13} {'BS porovnania':>14}")
+
+    for i, (ls, bs) in enumerate(zip(ls_vysledky, bs_vysledky)):
+        ls_cas = f"{ls[2]:.3f}" + ("*" if i in zle_ls else "")
+        bs_cas = f"{bs[2]:.4f}" + ("*" if i in zle_bs else "")
+        print(f"{i + 1:>3} {ls[0]:>12} | {ls[1]:>11} {ls_cas:>13} {ls[3]:>14} | "
+              f"{bs[1]:>11} {bs_cas:>13} {bs[3]:>14}")
+
+    ls_cas, ls_por = priemery(ls_vysledky)
+    bs_cas, bs_por = priemery(bs_vysledky)
+    print(f"Priemer: LS čas {ls_cas:.3f} ms, LS porovnania {ls_por:.1f}, "
+          f"BS čas {bs_cas:.4f} ms, BS porovnania {bs_por:.2f}")
+
+    najdene = sum(1 for x in ls_vysledky if x[1] != -1)
+    print(f"Nájdené hodnoty: {najdene}, nenájdené hodnoty: {len(ls_vysledky) - najdene}")
+    if zle_ls or zle_bs:
+        print("* časová anomália (čas na 1 porovnanie > 2 × medián), nie je v priemere")
+
+
+def vypis_odhad(n1, n2, ls1, bs1, ls2, bs2):
+    """Odhad pre väčšiu sadu z priemerov menšej sady a porovnanie so skutočnosťou."""
+    k_ls = n2 / n1                              # O(N)
+    k_bs = math.log2(n2) / math.log2(n1)        # O(log N)
+
+    print(f"\nOdhad pre N2 = {n2:_} (z priemerov N1)".replace("_", " "))
+    print(f"{'':16} {'odhad':>16} {'skutočnosť':>16} {'odhad / skut.':>14}")
+    for nazov, zaklad, skutocnost, k, fmt in (
+            ("LS čas (ms)", ls1[0], ls2[0], k_ls, ".3f"),
+            ("LS porovnania", ls1[1], ls2[1], k_ls, ".1f"),
+            ("BS čas (ms)", bs1[0], bs2[0], k_bs, ".4f"),
+            ("BS porovnania", bs1[1], bs2[1], k_bs, ".2f")):
+        odhad = zaklad * k
+        print(f"{nazov:16} {odhad:>16{fmt}} {skutocnost:>16{fmt}} {odhad / skutocnost:>14.1%}")
 
 
 def spusti_sadu(n, nazov_sady):
@@ -153,16 +186,7 @@ def spusti_sadu(n, nazov_sady):
     ls_vysledky = meraj(linear_search, arr, hladane_hodnoty)
     bs_vysledky = meraj(binary_search, arr, hladane_hodnoty)
 
-    vypis_vysledky(n, "Linear Search", ls_vysledky)
-    vypis_vysledky(n, "Binary Search", bs_vysledky)
-    vypis_priemery(nazov_sady, ls_vysledky, bs_vysledky)
-
-    najdene = sum(1 for x in ls_vysledky if x[1] != -1)
-    nenajdene = sum(1 for x in ls_vysledky if x[1] == -1)
-
-    print(f"\nKontrola sady {nazov_sady}:")
-    print(f"Nájdené hodnoty: {najdene}")
-    print(f"Nenájdené hodnoty: {nenajdene}")
+    vypis_tabulku(n, nazov_sady, ls_vysledky, bs_vysledky)
 
     return arr, hladane_hodnoty, ls_vysledky, bs_vysledky
 
@@ -173,6 +197,7 @@ def spusti_sadu(n, nazov_sady):
 
 if __name__ == "__main__":
     vysledky = {}
+    priemery_sady = {}
 
     for n, nazov_sady in ((10_000_000, "N1"), (100_000_000, "N2")):
         arr, hladane, ls, bs = spusti_sadu(n, nazov_sady)
@@ -184,10 +209,12 @@ if __name__ == "__main__":
             "LS": [{"hodnota": h, "pozicia": p, "cas_ms": c, "porovnania": k} for h, p, c, k in ls],
             "BS": [{"hodnota": h, "pozicia": p, "cas_ms": c, "porovnania": k} for h, p, c, k in bs],
         }
+        priemery_sady[nazov_sady] = (priemery(ls), priemery(bs))
         del arr                     # uvoľníme pamäť pred generovaním väčšej sady
+
+    vypis_odhad(vysledky["N1"]["n"], vysledky["N2"]["n"], *priemery_sady["N1"], *priemery_sady["N2"])
 
     with open("vysledky_tabulka1.json", "w", encoding="utf-8") as f:
         json.dump(vysledky, f, ensure_ascii=False, indent=2)
 
     print("\nVýsledky uložené do vysledky_tabulka1.json")
-    print("Odhady pre N = 100 000 000 sú v Exceli ako vzorce, nie ručne napísané hodnoty.")

@@ -10,7 +10,7 @@ import json
 import sys
 import time
 
-from JazdecDFS import STARTY, TAHY
+from JazdecDFS import STARTY, TAHY, vypis_hlavicku, vypis_riadok
 
 
 def jazdec_bfs(n, x, y, limit_s=None, max_agentov=None):
@@ -54,17 +54,20 @@ def jazdec_bfs(n, x, y, limit_s=None, max_agentov=None):
 
 if __name__ == "__main__":
     # python JazdecBFS.py [limit v sekundách] [max. počet ciest v pamäti]
-    limit_s = float(sys.argv[1]) if len(sys.argv) > 1 else 600
-    max_agentov = int(sys.argv[2]) if len(sys.argv) > 2 else 20_000_000
+    limit_s = float(sys.argv[1]) if len(sys.argv) > 1 else 120
+    max_agentov = int(sys.argv[2]) if len(sys.argv) > 2 else 15_000_000
     vysledky = []
+    zaklad = {}
+    vypis_hlavicku("BFS")
 
     for velkost, x, y in STARTY:
         nasiel, cesta, kroky, cas_ms, dokoncene = jazdec_bfs(velkost, x, y, limit_s, max_agentov)
-        stav = nasiel if dokoncene else "prerušené (limit času / pamäte)"
-        print(f"n = {velkost}  x,y = ({x},{y})  {stav}  {kroky:15_} ciest  {cas_ms:14.3f} ms".replace("_", " "))
+        vypis_riadok(velkost, x, y, nasiel, kroky, cas_ms, dokoncene, zaklad)
         vysledky.append({"n": velkost, "x": x, "y": y, "nasiel": nasiel, "kroky": kroky,
                          "cas_ms": cas_ms, "dokoncene": dokoncene,
                          "limit_s": limit_s, "max_agentov": max_agentov})
 
     with open("vysledky_jazdec_bfs.json", "w", encoding="utf-8") as f:
         json.dump(vysledky, f, ensure_ascii=False, indent=2)
+
+    print("≥ výpočet bol prerušený po limite času alebo pamäte, skutočná hodnota je väčšia")

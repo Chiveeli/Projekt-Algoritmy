@@ -169,6 +169,30 @@ def nastav_kurzor(rezim):
         pass  # staršie verzie Pygame systémové kurzory nepoznajú
 
 
+def vypis_hlavicku():
+    print("Flood Fill (zložitosť = O(n), n = počet pixelov)")
+    print(f"{'n (pixely)':>10} {'algoritmus':>10} {'čas odhad (ms)':>15} {'čas skutočnosť (ms)':>20} {'odhad / skut.':>14}")
+
+
+def vypis_vyplnenie(stav, zaklad):
+    """Vypíše do konzoly riadok ako v tabuľke 3; prvé meranie algoritmu je základ odhadu."""
+    pocet, cas_ms, algoritmus = stav["pocet"], stav["cas_ms"], stav["algoritmus"]
+    if not pocet:
+        return
+    if cas_ms is None:
+        print(f"{pocet:>10} {algoritmus:>10} {'–':>15} {'animácia zapnutá':>20} {'–':>14}", flush=True)
+        return
+
+    kluc = (algoritmus, stav["susedstvo"])
+    if kluc not in zaklad:
+        zaklad[kluc] = (pocet, cas_ms)
+        odhad_text, pomer = "X", "X"
+    else:
+        odhad = zaklad[kluc][1] * pocet / zaklad[kluc][0]
+        odhad_text, pomer = f"{odhad:.3f}", f"{odhad / cas_ms:.1%}"
+    print(f"{pocet:>10} {algoritmus:>10} {odhad_text:>15} {cas_ms:>20.3f} {pomer:>14}", flush=True)
+
+
 # ---------- hlavný program ----------
 ALGORITMY = ["BFS", "DFS", "DFS R"]
 
@@ -197,6 +221,8 @@ def main():
     kreslim = False
     posledny_bod = None
     vyplnanie = None           # bežiaci generátor flood_fill (počas animácie)
+    zaklad = {}                # prvé meranie každého algoritmu = základ odhadu
+    vypis_hlavicku()
 
     nastav_kurzor(stav["rezim"])
     bezi = True
@@ -251,6 +277,7 @@ def main():
                     stav["pocet"] = flood_fill_rekurzivne(platno, bod, stav["farba"])
                     stav["cas_ms"] = (time.perf_counter() - zac) * 1000
                     platno.unlock()
+                    vypis_vyplnenie(stav, zaklad)
                 else:
                     vyplnanie = flood_fill(platno, bod, stav["farba"],
                                            stav["algoritmus"], stav["susedstvo"])
@@ -265,6 +292,7 @@ def main():
                         stav["cas_ms"] = (time.perf_counter() - zac) * 1000
                         platno.unlock()
                         vyplnanie = None
+                        vypis_vyplnenie(stav, zaklad)
 
             elif udalost.type == pygame.MOUSEBUTTONUP and udalost.button == 1:
                 kreslim = False
@@ -287,6 +315,7 @@ def main():
                     stav["pocet"] = next(vyplnanie)
             except StopIteration:
                 vyplnanie = None
+                vypis_vyplnenie(stav, zaklad)
             platno.unlock()
 
         okno.blit(platno, (0, PANEL))

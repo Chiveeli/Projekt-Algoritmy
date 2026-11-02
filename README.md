@@ -21,7 +21,9 @@ python FloodFillMeranie.py
 python FloodFill.py                  # okno s kreslením a plechovkou (pip install pygame)
 ```
 
-Každý merací skript vypíše výsledky a uloží ich do súboru `vysledky_*.json`.
+Každý skript vypíše do konzoly údaje v rovnakej podobe ako v tabuľkách (merania, priemery, odhady a odhad / skutočnosť).
+Merací skript ich uloží aj do súboru `vysledky_*.json`. Nové spustenie dá iné časy a pri náhodných dátach aj iné hodnoty
+ako v Exceli, kde je zapísané jedno konkrétne meranie.
 
 ---
 
